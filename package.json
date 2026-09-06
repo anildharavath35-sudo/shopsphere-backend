@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon src/index.js",
-    "start": "node src/index.js",
+    "start": "npx prisma migrate deploy && node src/index.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
@@ -33,11 +33,14 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "multer": "^2.0.1",
+    "prisma": "^6.2.1",
     "razorpay": "^2.9.5"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9",
-    "prisma": "^6.2.1"
+    "nodemon": "^3.1.9"
+  },
+  "prisma": {
+    "seed": "node src/seed/seed.js"
   },
   "allowScripts": {
     "@prisma/client@6.19.3": true,

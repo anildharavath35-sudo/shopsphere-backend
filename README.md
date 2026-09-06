@@ -27,6 +27,8 @@ Copy `.env.example` to `.env` (see file for full list). Essentials:
 
 1. Create a **PostgreSQL** instance on Render and copy its internal connection string.
 2. Create a **Web Service** from this repo:
-   - Build: `npm install && npx prisma generate && npx prisma migrate deploy`
-   - Start: `npm run start`
+   - Build: `npm install && npx prisma generate && npx prisma migrate deploy && node src/seed/seed.js`
+   - Start: `npm run start` (runs `prisma migrate deploy` then boots, so migrations always apply)
 3. Set env vars: `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV=production`, `CLIENT_URL=<your vercel url>`, plus Razorpay keys if required.
+
+`prisma` is a production dependency (not devDependency), so `migrate deploy` works even if dev deps are skipped. `start` also applies migrations on every boot for safety. Demo data is seeded during the first build; the seed script skips automatically when data already exists (`npm run seed:reset` to wipe and reseed).
