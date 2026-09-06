@@ -1,0 +1,271 @@
+// ------------------------------------------------------------------
+// ShopSphere data model — PostgreSQL via Prisma ORM
+//
+// Statuses/roles are stored as plain strings (lowercase) so the API
+// contract is byte-for-byte identical to the previous MongoDB build.
+// App-level constants (in src/utils/constants.js) validate the values.
+// ------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------------
+// Users & addresses
+// ------------------------------------------------------------------
+
+model User {
+  id          String    @id @default(cuid())
+  fullname    String
+  email       String    @unique
+  phone       String
+  password    String
+  role        String    @default("customer") // customer | admin
+  isBlocked   Boolean   @default(false)
+  avatar      String    @default("")
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  addresses Address[]
+  cart      Cart?
+  wishlist  Wishlist?
+  orders    Order[]
+  reviews   Review[]
+
+  @@index([role])
+}
+
+model Address {
+  id         String   @id @default(cuid())
+  userId     String
+  fullname   String
+  phone      String
+  address    String
+  apartment  String   @default("")
+  city       String
+  state      String
+  postalCode String
+  country    String   @default("India")
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ------------------------------------------------------------------
+// Catalog
+// ------------------------------------------------------------------
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String   @default("")
+  image       String   @default("")
+  isActive    Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+
+  @@index([isActive])
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  description   String
+  brand         String
+  categoryId    String
+  mrp           Float
+  price         Float
+  images        String[] @default([])
+  thumbnail     String   @default("")
+  rating        Float    @default(0)
+  numReviews    Int      @default(0)
+  stock         Int      @default(0)
+  sku           String   @unique
+  specifications Json    @default("[]")
+  tags          String[] @default([])
+  featured      Boolean  @default(false)
+  bestseller    Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  views         Int      @default(0)
+  soldCount     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  category        Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  reviews         Review[]
+  cartItems       CartItem[]
+  orderItems      OrderItem[]
+  wishlistEntries WishlistProduct[]
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([featured])
+  @@index([bestseller])
+  @@index([price])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  rating    Int
+  title     String   @default("")
+  comment   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([productId])
+}
+
+// ------------------------------------------------------------------
+// Cart & wishlist
+// ------------------------------------------------------------------
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  productId String
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+  @@index([productId])
+}
+
+model Wishlist {
+  id        String            @id @default(cuid())
+  userId    String            @unique
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products WishlistProduct[]
+}
+
+model WishlistProduct {
+  id         String   @id @default(cuid())
+  wishlistId String
+  productId  String
+  createdAt  DateTime @default(now())
+
+  wishlist Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([wishlistId, productId])
+  @@index([productId])
+}
+
+// ------------------------------------------------------------------
+// Orders & payments
+// ------------------------------------------------------------------
+
+model Order {
+  id                String          @id @default(cuid())
+  orderId           String          @unique
+  userId            String
+  items             OrderItem[]
+  shippingAddress   Json
+  paymentMethod     String          @default("razorpay") // razorpay | cod
+  paymentStatus     String          @default("pending")  // pending | paid | failed | refunded
+  paymentDetails    Json            @default("{}")
+  orderStatus       String          @default("pending")  // see ORDER_STATUSES in src/utils/constants.js
+  statusHistory     StatusHistory[]
+  cancellable       Boolean         @default(true)
+  cancellationReason String          @default("")
+  subtotal          Float
+  discount          Float           @default(0)
+  deliveryCharge    Float           @default(0)
+  total             Float
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  payment Payment?
+
+  @@index([userId])
+  @@index([orderStatus])
+  @@index([paymentStatus])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String?
+  name      String
+  image     String  @default("")
+  brand     String  @default("")
+  // snapshot of prices at purchase time
+  price     Float
+  mrp       Float
+  quantity  Int
+  subtotal  Float
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model StatusHistory {
+  id      String   @id @default(cuid())
+  orderId String
+  status  String
+  at      DateTime @default(now())
+  note    String   @default("")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model Payment {
+  id                String    @id @default(cuid())
+  orderId           String    @unique
+  amount            Float
+  currency          String    @default("INR")
+  method            String    @default("razorpay")
+  status            String    @default("pending")
+  razorpayOrderId   String    @default("")
+  razorpayPaymentId String    @default("")
+  razorpaySignature String    @default("")
+  paidAt            DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
