@@ -3,6 +3,7 @@ import cors from 'cors';
 import morgan from 'morgan';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { existsSync } from 'node:fs';
 import apiRoutes from './routes/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { AppError } from './utils/AppError.js';
@@ -36,12 +37,17 @@ app.use('/api', (req, _res, next) => {
   next(new AppError(`Route ${req.originalUrl} not found`, 404, 'NOT_FOUND'));
 });
 
-// Serve built React frontend in production
-if (process.env.NODE_ENV === 'production') {
-  const clientDist = join(__dirname, '../../client/dist');
+// Serve built React frontend in production ONLY when the build exists.
+// - Monorepo-style deploy: server/ and client/ are siblings -> client/dist served,
+//   and GET / returns index.html (SPA falls through to React Router).
+// - Standalone API deploy (e.g. Render hosting server/ only, frontend on Vercel):
+//   client/dist is absent, so this block is skipped and the server stays API-only.
+const clientDist = join(__dirname, '../../client/dist');
+const clientIndex = join(clientDist, 'index.html');
+if (process.env.NODE_ENV === 'production' && existsSync(clientIndex)) {
   app.use(express.static(clientDist));
   app.get('*', (_req, res) => {
-    res.sendFile(join(clientDist, 'index.html'));
+    res.sendFile(clientIndex);
   });
 }
 
